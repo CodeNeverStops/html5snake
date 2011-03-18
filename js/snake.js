@@ -33,7 +33,6 @@
             return this.cells[x][y];
         },
         render: function(){
-            console.debug(1);
             snake.render();
             food.render();
         }
