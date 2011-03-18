@@ -12,7 +12,6 @@
         self.leftPadding = 10;
         self.cells = {}; // 0:floor 1:snake 2:food
     }
-    
     Map.prototype = {
         create: function(){
             var self = this;
@@ -33,26 +32,10 @@
         getCellByXY: function(x, y){
             return this.cells[x][y];
         },
-        draw: function(){
-            var self = this;
-            ctx.beginPath();
-            for (var x = 0; x < self.rows; x++) {
-                for (var y = 0; y < self.cols; y++) {
-                    var state = self.cells[x][y].state;
-                    if (state == 1) {
-                        ctx.fillStyle = '#FF0';
-                    }
-                    else 
-                        if (state == 2) {
-                            ctx.fillStyle = '#F00';
-                        }
-                        else {
-                            ctx.fillStyle = 'gray';
-                        }
-                    ctx.fillRect(self.leftPadding + x * self.cellSize, self.topPadding + y * self.cellSize, self.cellSize, self.cellSize);
-                }
-            }
-            ctx.fill();
+        render: function(){
+            console.debug(1);
+            snake.render();
+            food.render();
         }
     };
     
@@ -68,9 +51,19 @@
         cell.state = 2;
     }
     
+    Food.prototype = {
+        render: function() {
+            var self = this;
+            ctx.fillStyle = '#F00';
+            ctx.fillRect(map.leftPadding + self.x * map.cellSize, map.topPadding + self.y * map.cellSize, map.cellSize, map.cellSize);
+            ctx.fill();
+        }
+    };
+    
     function Snake(x, y, direct, len, speed){
         var self = this;
         self.body = [];
+        self.rmTail = [];
         if (len < 3) {
             len = 3;
         }
@@ -115,7 +108,6 @@
                 return false;
             }
             var len = self.body.length;
-            var show = 0;
             for (var i = 0; i < len; i++) {
                 var current = self.body[i];
                 var currentCell = map.cells[current.x][current.y];
@@ -123,36 +115,16 @@
                     self.die();
                     return false;
                 }
-                currentCell.state = 1;
-                if (i == 0) {
-                    continue;
-                }
-                if (food.onSnake == 0) {
-                    continue;
-                }
-                if (show == 1) {
-                    continue;
-                }
-                if (food.x == current.x && food.y == current.y) {
-                    currentCell.state = 2;
-                    show = 1;
-                }
             }
-            var newheadCell = map.getCellByXY(newhead.x, newhead.y);
-            newheadCell.state = 1;
             self.body.unshift(newhead);
             if (food.x == newhead.x && food.y == newhead.y) {
                 self.eat();
             }
             else {
-                var tail = self.body[self.body.length - 1];
-                cell = map.getCellByXY(tail.x, tail.y);
-                if (cell.state == 1) { // if it is a food, then still show
-                    cell.state = 0;
-                }
+                self.rmTail.push(self.body[self.body.length - 1]);
                 self.body.pop();
             }
-            map.draw();
+            map.render();
         },
         eat: function(){
             food = new Food();
@@ -193,6 +165,20 @@
         die: function(){
             this.stop();
             alert('snake die.');
+        },
+        render: function(){
+            var self = this, cell, i;
+            ctx.beginPath();
+            ctx.fillStyle = '#FF0';
+            for (i = 0; i < self.body.length; i++) {
+                ctx.fillRect(map.leftPadding + self.body[i].x * map.cellSize, map.topPadding + self.body[i].y * map.cellSize, map.cellSize, map.cellSize);
+            }
+            ctx.fillStyle = 'gray';
+            for (i = self.rmTail.length - 1; i >= 0; i--) {
+                ctx.fillRect(map.leftPadding + self.rmTail[i].x * map.cellSize, map.topPadding + self.rmTail[i].y * map.cellSize, map.cellSize, map.cellSize);
+                self.rmTail.pop();
+            }
+            ctx.fill();
         }
     };
     
