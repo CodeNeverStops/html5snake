@@ -9,8 +9,7 @@
         self.cols = cols;
         self.cellSize = 12;
         self.topPadding = 10;
-        self.leftPadding = 10;// 0:floor 1:snake 2:food
-        self.cells = [];
+        self.leftPadding = 10;// 0:floor 1:snake 2:food 3:wall
     }
     Map.prototype = {
         create: function(){
@@ -18,41 +17,44 @@
             ctx.fillStyle = "gray";
             ctx.beginPath();
             for (var x = 0; x < self.rows; x++) {
-                var tmp = [];
                 for (var y = 0; y < self.cols; y++) {
                     ctx.fillRect(self.leftPadding + self.cellSize * y, self.topPadding + self.cellSize * x, self.cellSize, self.cellSize);
-                    tmp.push({
-                        state : 0
-                    });
                 }
-                self.cells.push(tmp);
             }
             ctx.fill();
-        },
-        getCellByXY: function(x, y) {
-            return this.cells[x][y];
         }
     };
     
     function Food(){
-        var self = this;
-        self.x = Math.floor(Math.random() * game.map.rows);
-        self.y = Math.floor(Math.random() * game.map.cols);
-        self.fillStyle = '#F00';
-        self.onSnake = 0;
-        if (game.map.getCellByXY(self.x, self.y).state == 1) {
-            self.onSnake = 1;
-            game.map.getCellByXY(self.x, self.y).state = 2;
-        }
-        self.render();
+        this.fillStyle = "#F00";
+        this.cells = [];
     }
     
     Food.prototype = {
+        generate: function(){
+            this.cells.push({
+                x : Math.floor(Math.random() * game.map.rows),
+                y : Math.floor(Math.random() * game.map.cols)
+            });
+        },
+        remove: function(x, y){
+            var self = this;
+            for (var i in self.cells) {
+                if (self.cells[i].x == x && self.cells[i].y == y) {
+                    delete self.cells[i];
+                    break;
+                }
+            }  
+        },
         render: function(){
-            var self = this, map = game.map;
+            var self = this, map = game.map, cellLen, tmp;
             ctx.beginPath();
             ctx.fillStyle = self.fillStyle;
-            ctx.fillRect(map.leftPadding + self.x * map.cellSize, map.topPadding + self.y * map.cellSize, map.cellSize, map.cellSize);
+            cellLen = self.cells.length;
+            for (var i in self.cells) {
+                tmp = self.cells[i];
+                ctx.fillRect(map.leftPadding + tmp.x * map.cellSize, map.topPadding + tmp.y * map.cellSize, map.cellSize, map.cellSize);
+            }
             ctx.fill();
         }
     };
@@ -66,7 +68,6 @@
         for (var i = 0; i < len; i++) {
             var tmp_x = x + direct.x * i;
             var tmp_y = y + direct.y * i;
-            game.map.getCellByXY(tmp_x, tmp_y).state = 1;
             this.body.unshift({
                 x: tmp_x,
                 y: tmp_y
@@ -80,8 +81,7 @@
     }
     Snake.prototype = {
         move: function(){
-            var self = this, map = game.map;
-            // console.debug(this.direct);
+            var self = this, map = game.map, i = 0;
             var cell, head = self.body[0], newhead = {
                 x: head.x + self.direct.x,
                 y: head.y + self.direct.y
@@ -92,33 +92,31 @@
                 return false;
             }
             var len = self.body.length;
-            for (var i = 0; i < len; i++) {
+            for (; i < len; i++) {
                 var current = self.body[i];
-                game.map.getCellByXY(current.x,current.y).state = 1;
                 if (newhead.x == current.x && newhead.y == current.y) { // check whether the snake hit his body
                     self.die();
                     return false;
                 }
             }
             self.body.unshift(newhead);
-            for (var i in game.foods) {
-                var currentFood = game.foods[i];
+            for (var j in game.food.cells) {
+                var currentFood = game.food.cells[j];
+                game.log(currentFood);
                 if (currentFood.x == newhead.x && currentFood.y == newhead.y) {
-                    delete game.foods[i];
-                    game.map.getCellByXY(currentFood.x, currentFood.y).state = 1;
-                    self.eat();
+                    self.eat(currentFood.x, currentFood.y);
                 }
                 else {
-                    var tail = self.body[self.body.length - 1];
-                    self.rmTail.push(tail);
-                    game.map.getCellByXY(tail.x, tail.y).state = 0;
+                    self.rmTail.push(self.body[self.body.length - 1]);
                     self.body.pop();
                 }
             }
             self.render();
+            game.food.render();
         },
-        eat: function(){
-            game.foods.push(new Food());
+        eat: function(x, y){
+            game.food.remove(x, y);
+            game.food.generate();
             // score.add(score_per_food);
             // score_panel.update(score.get());
         },
@@ -159,7 +157,7 @@
             alert('snake die.');
         },
         render: function(){
-            var self = this, i, map = game.map;
+            var self = this, i = 0, map = game.map;
             ctx.beginPath();
             ctx.fillStyle = '#FF0';
             for (i = 0; i < self.body.length; i++) {
@@ -169,13 +167,6 @@
             for (i = self.rmTail.length - 1; i >= 0; i--) {
                 ctx.fillRect(map.leftPadding + self.rmTail[i].x * map.cellSize, map.topPadding + self.rmTail[i].y * map.cellSize, map.cellSize, map.cellSize);
                 self.rmTail.pop();
-            }
-            for (var i in game.foods) {
-                var food = game.foods[i];
-                if (food.onSnake == 1) {
-                    ctx.fillStyle = food.fillStyle;
-                    ctx.fillRect(map.leftPadding + food.x * map.cellSize, map.topPadding + food.y * map.cellSize, map.cellSize, map.cellSize);
-                }
             }
             ctx.fill();
         }
@@ -232,12 +223,12 @@
     
     function Game(){
         var self = this;
-        self.foods = [], self.walls = [];
         self.snake = null, self.map = null, self.direct = null, self.food = null;
     }
     
     Game.prototype = {
         options: {
+            debug: 0,
             mapWidth: 20,
             mapHeight: 20,
             snakeLength: 5,
@@ -256,7 +247,11 @@
             (options.mapHeight - options.snakeLength * 2) +
             parseInt(options.snakeLength));
             self.snake = new Snake(x, y, self.direct.getByRandom(), options.snakeLength, options.snakeSpeed);
-            self.foods.push(new Food());
+            self.food = new Food();
+            self.food.generate();
+        },
+        log: function(str) {
+            game.options.debug && window.console && console.debug && console.debug(str);
         }
     };
     
